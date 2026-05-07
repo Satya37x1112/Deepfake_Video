@@ -15,6 +15,8 @@ import requests
 import base64
 import io
 import concurrent.futures
+import subprocess
+import tempfile
 from sklearn.metrics import confusion_matrix
 import math
 from scipy import signal
@@ -186,40 +188,73 @@ def extract_face_region(frame):
     face_region = frame[y:y+h, x:x+w]
     return face_region
 
-# OPTIMIZED: Faster video loading with reduced quality checks
+# OPTIMIZED: Faster video loading with reduced quality checks and ffmpeg fallback
 def load_video(path, max_frames=20, resize=(IMG_SIZE, IMG_SIZE)):
-    """Load video frames - optimized for speed"""
+    """Load video frames - optimized for speed with ffmpeg fallback"""
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        print(f"[ERROR] Video file missing or empty: {path}")
+        return np.array([])
+
     cap = cv2.VideoCapture(path)
     frames = []
-    
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"[INFO] OpenCV reports {total_frames} frames for {os.path.basename(path)}")
+
     try:
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
-        # Sample frames evenly across the video
         if total_frames > max_frames:
             frame_indices = np.linspace(0, total_frames - 1, max_frames, dtype=int)
         else:
             frame_indices = list(range(min(total_frames, max_frames)))
-        
+
         for frame_idx in frame_indices:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(frame_idx))
             ret, frame = cap.read()
             if not ret:
+                print(f"[WARN] OpenCV failed to read frame {frame_idx}")
                 continue
-            
-            # Simple center crop and resize
             frame = crop_center_square(frame)
             frame = cv2.resize(frame, resize)
             frame = frame[:, :, [2, 1, 0]]  # BGR to RGB
             frames.append(frame)
-            
             if len(frames) >= max_frames:
                 break
-            
+    except Exception as e:
+        print(f"[ERROR] OpenCV video read error: {e}")
     finally:
         cap.release()
-    
-    return np.array(frames)
+
+    if len(frames) > 0:
+        print(f"[INFO] Loaded {len(frames)} frames via OpenCV")
+        return np.array(frames)
+
+    # ffmpeg fallback
+    print(f"[INFO] OpenCV returned 0 frames. Trying ffmpeg fallback...")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cmd = [
+                'ffmpeg', '-y', '-i', path,
+                '-vf', f'select=not(mod(n\\,{max(1, total_frames // max_frames if total_frames else 1)})),scale={resize[0]}:{resize[1]}',
+                '-frames:v', str(max_frames),
+                '-pix_fmt', 'rgb24',
+                os.path.join(tmpdir, 'frame_%03d.png')
+            ]
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=30)
+            for fname in sorted(os.listdir(tmpdir)):
+                if fname.endswith('.png'):
+                    img = cv2.imread(os.path.join(tmpdir, fname))
+                    if img is not None:
+                        img = crop_center_square(img)
+                        img = cv2.resize(img, resize)
+                        img = img[:, :, [2, 1, 0]]
+                        frames.append(img)
+            if len(frames) > 0:
+                print(f"[INFO] Loaded {len(frames)} frames via ffmpeg")
+                return np.array(frames)
+    except Exception as e:
+        print(f"[WARN] ffmpeg fallback failed: {e}")
+
+    print(f"[ERROR] Could not extract frames from video: {path}")
+    return np.array([])
 
 # Function to crop the center square of a video frame
 def crop_center_square(frame):
