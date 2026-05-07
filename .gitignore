@@ -16,21 +16,20 @@ __pycache__/
 
 # User Upload Folders
 uploads/
-DeepFakeVideoDetection/uploads/
 
 # Datasets (Extremely heavy video files)
-DeepFakeVideoDetection/dataset/
+dataset/
 
 # Heavy Model Weights and Backups
 # Ignore all files in the model folder
-DeepFakeVideoDetection/model/*
+model/*
 # EXCEPT the main active production model (deepfake_video_model.h5)
-!DeepFakeVideoDetection/model/deepfake_video_model.h5
+!model/deepfake_video_model.h5
 
 # Inactive training-related modules or backups
-DeepFakeVideoDetection/video-detection-module/saved-models/
-DeepFakeVideoDetection/video-detection-module/training-data/
-DeepFakeVideoDetection/video-detection-module/uploads/
+video-detection-module/saved-models/
+video-detection-module/training-data/
+video-detection-module/uploads/
 
 # OS-generated files
 .DS_Store

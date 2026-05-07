@@ -2,7 +2,6 @@ services:
   - type: web
     name: deepfake-video-detection
     env: python
-    rootDir: DeepFakeVideoDetection
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --workers=1 --threads=1 --timeout=120 app:app
     envVars:
