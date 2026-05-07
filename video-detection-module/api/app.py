@@ -11,6 +11,10 @@ import os
 import sys
 import ssl
 import urllib
+import requests
+import base64
+import io
+import concurrent.futures
 from sklearn.metrics import confusion_matrix
 import math
 from scipy import signal
@@ -68,6 +72,12 @@ except Exception as e:
     traceback.print_exc()
     print("\n[WARNING] Running without model - predictions will not work")
     model = None
+
+# OpenRouter config
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openai/gpt-4o-mini')
+OPENROUTER_TIMEOUT = 15  # seconds fallback trigger
+OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 # Define constants
 IMG_SIZE = 224
@@ -326,6 +336,122 @@ def prepare_single_video(frames):
     
     return prepared_features, frame_mask, additional_features
 
+def encode_frame_to_base64(frame, size=(256, 256)):
+    """Resize and encode a frame to base64 JPEG for API usage."""
+    try:
+        resized = cv2.resize(frame, size)
+        if len(resized.shape) == 3 and resized.shape[2] == 3:
+            resized = cv2.cvtColor(resized, cv2.COLOR_RGB2BGR)
+        ok, buf = cv2.imencode('.jpg', resized)
+        if not ok:
+            return None
+        return base64.b64encode(buf).decode('utf-8')
+    except Exception as e:
+        print(f"[WARN] Frame encode error: {e}")
+        return None
+
+def get_sample_frames(video_path, num_samples=3):
+    """Extract evenly spaced sample frames for OpenRouter fallback."""
+    try:
+        cap = cv2.VideoCapture(video_path)
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if total <= 0:
+            cap.release()
+            return []
+        indices = np.linspace(0, total - 1, min(num_samples, total), dtype=int)
+        frames = []
+        for idx in indices:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(idx))
+            ret, frame = cap.read()
+            if ret:
+                frames.append(frame)
+        cap.release()
+        return frames
+    except Exception as e:
+        print(f"[WARN] Sample frame extraction error: {e}")
+        return []
+
+def call_openrouter_api(video_path):
+    """Call OpenRouter vision model as fallback when local model fails/times out."""
+    if not OPENROUTER_API_KEY:
+        return {'error': 'OPENROUTER_API_KEY not set. Cannot use API fallback.'}, 0.0
+    frames = get_sample_frames(video_path, num_samples=3)
+    if not frames:
+        return {'error': 'Could not extract frames for API fallback.'}, 0.0
+    images = []
+    for f in frames:
+        b64 = encode_frame_to_base64(f)
+        if b64:
+            images.append({'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{b64}'}})
+    if not images:
+        return {'error': 'Failed to encode frames for API fallback.'}, 0.0
+    prompt = (
+        "You are a deepfake detection assistant. Analyze the provided video frames carefully. "
+        "Look for visual artifacts typical of deepfakes: unnatural skin texture, misaligned eyes or lips, "
+        "flickering around face edges, inconsistent lighting, warped backgrounds, or odd teeth/tongue. "
+        "Respond ONLY with a single JSON object in this exact format: {\"result\": \"FAKE\" or \"REAL\", \"confidence\": 0 to 100, \"reasoning\": \"short summary\"}. "
+        "No markdown, no code blocks, just raw JSON."
+    )
+    messages = [{'role': 'user', 'content': [{'type': 'text', 'text': prompt}] + images}]
+    try:
+        resp = requests.post(
+            OPENROUTER_URL,
+            headers={'Authorization': f'Bearer {OPENROUTER_API_KEY}', 'Content-Type': 'application/json'},
+            json={'model': OPENROUTER_MODEL, 'messages': messages, 'max_tokens': 300},
+            timeout=20
+        )
+        data = resp.json()
+        if resp.status_code != 200 or 'choices' not in data:
+            print(f"[OPENROUTER ERROR] {data}")
+            return {'error': f'OpenRouter API error: {data.get("error", "unknown")}'}, 0.0
+        content = data['choices'][0]['message']['content'].strip()
+        import json
+        if content.startswith('```'):
+            lines = content.splitlines()
+            if lines[0].startswith('```'):
+                lines = lines[1:]
+            if lines and lines[-1].startswith('```'):
+                lines = lines[:-1]
+            content = '\n'.join(lines).strip()
+        result = json.loads(content)
+        label = result.get('result', 'UNKNOWN')
+        confidence = float(result.get('confidence', 50))
+        return {
+            'result': label,
+            'confidence': round(confidence, 2),
+            'raw_score': confidence / 100.0,
+            'method': 'openrouter_fallback',
+            'model_info': OPENROUTER_MODEL,
+            'reasoning': result.get('reasoning', ''),
+            'frame_count': len(images)
+        }, confidence / 100.0
+    except Exception as e:
+        print(f"[OPENROUTER EXCEPTION] {e}")
+        return {'error': f'OpenRouter fallback failed: {str(e)}'}, 0.0
+
+def local_predict(video_path):
+    """Run the local trained model pipeline. Raises on failure so timeout can catch it."""
+    frames = load_video(video_path, max_frames=MAX_SEQ_LENGTH)
+    if len(frames) == 0:
+        raise ValueError('Could not extract frames from video')
+    prepared_features, frame_mask, _ = prepare_single_video(frames)
+    if prepared_features is None or 'inception' not in prepared_features:
+        raise ValueError('Failed to extract video features')
+    model_prediction = model.predict([prepared_features['inception'], frame_mask], verbose=0)[0][0]
+    threshold = 0.5
+    predicted_label = 'FAKE' if model_prediction >= threshold else 'REAL'
+    confidence = float(model_prediction) * 100 if predicted_label == 'FAKE' else float(1 - model_prediction) * 100
+    return {
+        'result': predicted_label,
+        'confidence': round(confidence, 2),
+        'raw_score': float(model_prediction),
+        'threshold': threshold,
+        'frame_count': len(frames),
+        'method': 'trained_model',
+        'model_info': 'Trained on 395 videos (81% accuracy, 100% fake detection)',
+        'processing_time': 'optimized'
+    }, confidence / 100.0
+
 # Enhanced prediction with multiple approaches
 def ensemble_predict(prepared_features, frame_mask, additional_features):
     """Make predictions using ensemble methods"""
@@ -560,60 +686,39 @@ def predict():
         
         print(f"[INFO] Model is loaded and ready")
         
-        # SIMPLIFIED AND FASTER DETECTION - Use trained model directly
+        # SIMPLIFIED AND FASTER DETECTION - Use trained model directly with 15s timeout
         try:
-            # Load video frames (matching training: 30 frames)
-            frames = load_video(video_path, max_frames=30)  # MUST match MAX_SEQ_LENGTH for model compatibility
-            
-            if len(frames) == 0:
-                return jsonify({'error': 'Could not extract frames from video'}), 500
-            
-            print(f"[INFO] Loaded {len(frames)} frames")
-            
-            # Prepare features using ONLY InceptionV3 (fastest)
-            prepared_features, frame_mask, additional_features = prepare_single_video(frames)
-            
-            if prepared_features is None or 'inception' not in prepared_features:
-                return jsonify({'error': 'Failed to extract video features'}), 500
-            
-            # Make prediction with trained model
-            model_prediction = model.predict(
-                [prepared_features['inception'], frame_mask], 
-                verbose=0
-            )[0][0]
-            
-            # Determine result with LOWER threshold for better fake detection
-            # The model outputs high values for FAKE videos
-            threshold = 0.5
-            predicted_label = 'FAKE' if model_prediction >= threshold else 'REAL'
-            
-            # Calculate confidence
-            if predicted_label == 'FAKE':
-                confidence = float(model_prediction) * 100  # 0.5-1.0 -> 50-100%
-            else:
-                confidence = float(1 - model_prediction) * 100  # 0.5-0.0 -> 50-100%
-            
-            print(f"[TRAINED MODEL] Raw score: {model_prediction:.4f}")
-            print(f"[TRAINED MODEL] Prediction: {predicted_label} (Confidence: {confidence:.2f}%)")
-            
-            result_dict = {
-                'result': predicted_label,
-                'confidence': round(confidence, 2),
-                'raw_score': float(model_prediction),
-                'threshold': threshold,
-                'frame_count': len(frames),
-                'method': 'trained_model',
-                'model_info': 'Trained on 395 videos (81% accuracy, 100% fake detection)',
-                'processing_time': 'optimized'
-            }
-            
-            print(f"[SUCCESS] Detection complete: {predicted_label} ({confidence:.2f}%)")
-            return jsonify(result_dict)
+            print(f"[INFO] Running local model with {OPENROUTER_TIMEOUT}s timeout")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(local_predict, video_path)
+                try:
+                    result_dict, _ = future.result(timeout=OPENROUTER_TIMEOUT)
+                    print(f"[SUCCESS] Local detection complete: {result_dict['result']} ({result_dict['confidence']}%)")
+                    return jsonify(result_dict)
+                except concurrent.futures.TimeoutError:
+                    print(f"[WARN] Local model timed out after {OPENROUTER_TIMEOUT}s. Switching to OpenRouter API fallback...")
+                    # Attempt to cancel the running thread (best effort)
+                    future.cancel()
+                    # OpenRouter fallback
+                    fallback_result, _ = call_openrouter_api(video_path)
+                    if 'error' in fallback_result:
+                        print(f"[ERROR] OpenRouter fallback also failed: {fallback_result['error']}")
+                        return jsonify({'error': f'Local model timed out and OpenRouter fallback failed: {fallback_result["error"]}'}), 500
+                    print(f"[SUCCESS] OpenRouter fallback result: {fallback_result['result']} ({fallback_result['confidence']}%)")
+                    return jsonify(fallback_result)
                     
         except Exception as e:
             print(f"[ERROR] Prediction error: {str(e)}")
             import traceback
             traceback.print_exc()
+            # Try OpenRouter as last resort on exception too
+            try:
+                fallback_result, _ = call_openrouter_api(video_path)
+                if 'error' not in fallback_result:
+                    print(f"[SUCCESS] OpenRouter fallback on exception: {fallback_result['result']}")
+                    return jsonify(fallback_result)
+            except Exception as api_e:
+                print(f"[ERROR] OpenRouter fallback exception: {api_e}")
             return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
         
     except Exception as e:
