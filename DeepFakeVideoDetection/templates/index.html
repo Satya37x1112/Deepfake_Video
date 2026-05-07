@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maya Video Detector</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #6e2815 0%, #4a1a0e 100%);
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            animation: float 15s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.3; }
+            50% { transform: translateY(-100px) rotate(180deg); opacity: 0.8; }
+        }
+
+        /* Header */
+        header {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 50px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom: 15px;
+            animation: slideDown 0.8s ease;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            color: rgba(255, 255, 255, 0.95);
+            font-weight: 300;
+            animation: slideDown 1s ease;
+            letter-spacing: 1px;
+        }
+
+        .tech-badge {
+            display: inline-block;
+            margin: 15px 5px 0;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: white;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            animation: fadeIn 1.5s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 10;
+            max-width: 1400px;
+            margin: 50px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 35px;
+        }
+
+        @media (max-width: 968px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            h1 {
+                font-size: 2.2rem;
+            }
+        }
+
+        /* Section Cards */
+        .section {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 25px;
+            box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: fadeInUp 0.8s ease;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .section:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 35px 90px rgba(0, 0, 0, 0.45);
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section h2 {
+            font-size: 2rem;
+            background: linear-gradient(135deg, #6e2815, #4a1a0e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .section h2 i {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #6e2815, #4a1a0e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .section p {
+            color: #555;
+            margin-bottom: 25px;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        /* File Upload Area */
+        .input-container {
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .file-upload-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-upload-label {
+            display: block;
+            padding: 50px 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border: 3px dashed #6e2815;
+            border-radius: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .file-upload-label:hover {
+            border-color: #4a1a0e;
+            background: linear-gradient(135deg, #e0e5ec 0%, #b8c5d6 100%);
+            transform: scale(1.02);
+        }
+
+        .file-upload-label::before {
+            content: '\f093';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 3rem;
+            color: #6e2815;
+            display: block;
+            margin-bottom: 15px;
+        }
+
+        .file-upload-label .upload-text {
+            font-size: 1.1rem;
+            color: #6e2815;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .file-upload-label .upload-subtext {
+            font-size: 0.9rem;
+            color: #888;
+            font-weight: 400;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-radius: 15px;
+            font-size: 0.95rem;
+            display: none;
+            border-left: 5px solid #6e2815;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .file-info strong {
+            color: #6e2815;
+            font-weight: 600;
+        }
+
+        /* Video Preview */
+        .preview-container {
+            margin: 25px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+
+        video {
+            width: 100%;
+            display: block;
+            border-radius: 15px;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 25px 0;
+            display: none;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #6e2815 0%, #4a1a0e 100%);
+            transition: width 0.3s ease;
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -100% 0; }
+            100% { background-position: 100% 0; }
+        }
+
+        /* Buttons */
+        button {
+            padding: 18px 45px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #6e2815 0%, #4a1a0e 100%);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(110, 40, 21, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            transition: left 0.5s ease;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(110, 40, 21, 0.6);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* Spinner */
+        .spinner-container {
+            display: none;
+            justify-content: center;
+            align-items: center;
+            margin: 30px 0;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(110, 40, 21, 0.2);
+            border-top-color: #6e2815;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results */
+        .result-container {
+            display: none;
+            margin-top: 30px;
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 20px;
+            border-left: 6px solid #6e2815;
+            animation: fadeInUp 0.5s ease;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .result-status {
+            font-size: 2rem;
+            font-weight: 700;
+            padding: 15px 30px;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .result-fake {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+        }
+
+        .result-real {
+            background: linear-gradient(135deg, #51cf66 0%, #37b24d 100%);
+            color: white;
+            box-shadow: 0 10px 30px rgba(81, 207, 102, 0.4);
+        }
+
+        .confidence-score {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #6e2815;
+        }
+
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 25px;
+        }
+
+        .detail-card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .detail-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .detail-card i {
+            font-size: 2rem;
+            color: #6e2815;
+            margin-bottom: 10px;
+        }
+
+        .detail-card .label {
+            font-size: 0.85rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .detail-card .value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        /* Dataset Section */
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .video-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 15px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            border: 2px solid transparent;
+        }
+
+        .video-card:hover {
+            transform: scale(1.05);
+            border-color: #6e2815;
+            box-shadow: 0 8px 20px rgba(110, 40, 21, 0.3);
+        }
+
+        .video-card i {
+            font-size: 2.5rem;
+            color: #6e2815;
+            margin-bottom: 10px;
+        }
+
+        .video-card .video-name {
+            font-size: 0.8rem;
+            color: #555;
+            word-wrap: break-word;
+        }
+
+        /* Footer */
+        footer {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            padding: 30px;
+            margin-top: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+        }
+
+        .ml-techniques {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .ml-badge {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .ml-badge:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #6e2815 0%, #4a1a0e 100%);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #4a1a0e 0%, #6e2815 100%);
+        }
+    </style>
+</head>
+<body>
+    <!-- Animated Background Particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Header -->
+    <header>
+        <h1><i class="fas fa-shield-alt"></i> AI Deepfake Detection System</h1>
+        <p class="subtitle">Advanced Multi-Model Machine Learning Detection</p>
+        <div>
+            <span class="tech-badge"><i class="fas fa-brain"></i> InceptionV3</span>
+            <span class="tech-badge"><i class="fas fa-network-wired"></i> ResNet50</span>
+            <span class="tech-badge"><i class="fas fa-project-diagram"></i> VGG16</span>
+            <span class="tech-badge"><i class="fas fa-chart-line"></i> Temporal Analysis</span>
+            <span class="tech-badge"><i class="fas fa-eye"></i> Face Detection</span>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Upload Section -->
+        <div class="section">
+            <h2><i class="fas fa-cloud-upload-alt"></i> Upload Video</h2>
+            <p>Upload a video file to detect if it's a deepfake using advanced AI algorithms</p>
+            
+            <div class="input-container">
+                <div class="file-upload-wrapper">
+                    <label for="videoInput" class="file-upload-label">
+                        <span class="upload-text">Click or Drag to Upload</span>
+                        <span class="upload-subtext">MP4, AVI, MOV, MKV, WMV, FLV, WEBM (Max: 500MB)</span>
+                    </label>
+                    <input type="file" id="videoInput" accept=".mp4,.avi,.mov,.mkv,.wmv,.flv,.webm" onchange="previewVideo(event)">
+                </div>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+
+            <div class="preview-container" id="previewContainer">
+                <video id="videoPlayer" controls></video>
+            </div>
+
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+
+            <button onclick="submitVideo()" id="detectButton">
+                <i class="fas fa-search"></i> Detect Deepfake
+            </button>
+
+            <div class="spinner-container" id="videoSpinner">
+                <div class="spinner"></div>
+            </div>
+
+            <div class="result-container" id="detectionResult"></div>
+        </div>
+
+        <!-- Dataset Section -->
+        <div class="section">
+            <h2><i class="fas fa-database"></i> Test Dataset</h2>
+            <p>Select a video from our test dataset to analyze</p>
+            
+            <div class="video-grid" id="datasetVideos">
+                <div class="video-card" onclick="testDatasetVideo('fake1.mp4')">
+                    <i class="fas fa-video"></i>
+                    <div class="video-name">fake1.mp4</div>
+                </div>
+                <div class="video-card" onclick="testDatasetVideo('fake2.mp4')">
+                    <i class="fas fa-video"></i>
+                    <div class="video-name">fake2.mp4</div>
+                </div>
+                <div class="video-card" onclick="testDatasetVideo('real1.mp4')">
+                    <i class="fas fa-video"></i>
+                    <div class="video-name">real1.mp4</div>
+                </div>
+                <div class="video-card" onclick="testDatasetVideo('real2.mp4')">
+                    <i class="fas fa-video"></i>
+                    <div class="video-name">real2.mp4</div>
+                </div>
+                <div class="video-card" onclick="testDatasetVideo('real3.mp4')">
+                    <i class="fas fa-video"></i>
+                    <div class="video-name">real3.mp4</div>
+                </div>
+                <div class="video-card" onclick="testDatasetVideo('almost_real_but_fake.mp4')">
+                    <i class="fas fa-video"></i>
+                    <div class="video-name">almost_real_but_fake.mp4</div>
+                </div>
+            </div>
+
+            <div class="spinner-container" id="datasetSpinner">
+                <div class="spinner"></div>
+            </div>
+
+            <div class="result-container" id="datasetResult"></div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <h3><i class="fas fa-robot"></i> Advanced ML Techniques Used</h3>
+        <div class="ml-techniques">
+            <div class="ml-badge"><i class="fas fa-layer-group"></i> Multi-Model Ensemble</div>
+            <div class="ml-badge"><i class="fas fa-clock"></i> Temporal Consistency</div>
+            <div class="ml-badge"><i class="fas fa-compress-arrows-alt"></i> Motion Analysis</div>
+            <div class="ml-badge"><i class="fas fa-user"></i> Face Detection</div>
+            <div class="ml-badge"><i class="fas fa-filter"></i> Quality Filtering</div>
+            <div class="ml-badge"><i class="fas fa-brain"></i> Deep Learning</div>
+            <div class="ml-badge"><i class="fas fa-chart-bar"></i> Confidence Scoring</div>
+        </div>
+        <p style="margin-top: 20px; font-size: 0.9rem;">© 2025 AI Deepfake Detection System | Powered by TensorFlow & Advanced Neural Networks</p>
+    </footer>
+
+    <script>
+        // Create animated particles
+        function createParticles() {
+            const particles = document.getElementById('particles');
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.width = Math.random() * 60 + 20 + 'px';
+                particle.style.height = particle.style.width;
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 15 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                particles.appendChild(particle);
+            }
+        }
+        createParticles();
+
+        function previewVideo(event) {
+            const videoInput = document.getElementById('videoInput');
+            const videoPlayer = document.getElementById('videoPlayer');
+            const fileInfo = document.getElementById('fileInfo');
+            const detectButton = document.getElementById('detectButton');
+            const previewContainer = document.getElementById('previewContainer');
+            const file = videoInput.files[0];
+
+            if (file) {
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                const maxSize = 500;
+                
+                const allowedTypes = ['mp4', 'avi', 'mov', 'mkv', 'wmv', 'flv', 'webm'];
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+                
+                fileInfo.innerHTML = `
+                    <i class="fas fa-file-video"></i>
+                    <strong>File:</strong> ${file.name}<br>
+                    <strong>Size:</strong> ${fileSize} MB<br>
+                    <strong>Type:</strong> ${file.type || 'video/' + fileExtension}
+                `;
+                fileInfo.style.display = 'block';
+                
+                if (!allowedTypes.includes(fileExtension)) {
+                    fileInfo.innerHTML += '<br><span style="color: #ff6b6b;"><i class="fas fa-exclamation-triangle"></i> File type not supported!</span>';
+                    detectButton.disabled = true;
+                    return;
+                }
+                
+                if (file.size > maxSize * 1024 * 1024) {
+                    fileInfo.innerHTML += '<br><span style="color: #ff6b6b;"><i class="fas fa-exclamation-triangle"></i> File too large! Max 500MB</span>';
+                    detectButton.disabled = true;
+                    return;
+                }
+
+                detectButton.disabled = false;
+                
+                const url = URL.createObjectURL(file);
+                videoPlayer.src = url;
+                previewContainer.style.display = 'block';
+            }
+        }
+
+        function submitVideo() {
+            const videoInput = document.getElementById('videoInput');
+            const videoSpinner = document.getElementById('videoSpinner');
+            const detectionResult = document.getElementById('detectionResult');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const detectButton = document.getElementById('detectButton');
+
+            const file = videoInput.files[0];
+            if (!file) {
+                alert('Please upload a video file.');
+                return;
+            }
+
+            detectButton.disabled = true;
+            detectButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            
+            videoSpinner.style.display = 'flex';
+            progressBar.style.display = 'block';
+            detectionResult.style.display = 'none';
+            detectionResult.innerHTML = '';
+            
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 1;
+                progressFill.style.width = progress + '%';
+                if (progress >= 90) clearInterval(progressInterval);
+            }, 100);
+
+            const formData = new FormData();
+            formData.append('video', file);
+
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                
+                setTimeout(() => {
+                    videoSpinner.style.display = 'none';
+                    progressBar.style.display = 'none';
+                    detectButton.disabled = false;
+                    detectButton.innerHTML = '<i class="fas fa-search"></i> Detect Deepfake';
+                    
+                    displayResults(data, 'detectionResult');
+                }, 500);
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                videoSpinner.style.display = 'none';
+                progressBar.style.display = 'none';
+                detectButton.disabled = false;
+                detectButton.innerHTML = '<i class="fas fa-search"></i> Detect Deepfake';
+                
+                detectionResult.innerHTML = `
+                    <div style="color: #ff6b6b;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+                detectionResult.style.display = 'block';
+            });
+        }
+
+        function testDatasetVideo(videoName) {
+            const datasetSpinner = document.getElementById('datasetSpinner');
+            const datasetResult = document.getElementById('datasetResult');
+            
+            datasetSpinner.style.display = 'flex';
+            datasetResult.style.display = 'none';
+            datasetResult.innerHTML = '';
+
+            fetch(`/test_dataset/${videoName}`)
+            .then(response => response.json())
+            .then(data => {
+                datasetSpinner.style.display = 'none';
+                displayResults(data, 'datasetResult');
+            })
+            .catch(error => {
+                datasetSpinner.style.display = 'none';
+                datasetResult.innerHTML = `
+                    <div style="color: #ff6b6b;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+                datasetResult.style.display = 'block';
+            });
+        }
+
+        function displayResults(data, containerId) {
+            const resultContainer = document.getElementById(containerId);
+            
+            if (data.error) {
+                resultContainer.innerHTML = `
+                    <div style="color: #ff6b6b;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>Error:</strong> ${data.error}
+                    </div>
+                `;
+                resultContainer.style.display = 'block';
+                return;
+            }
+
+            const result = data.result || 'UNKNOWN';
+            const confidence = ((data.confidence || 0) * 100).toFixed(2);
+            const rawPrediction = ((data.raw_prediction || 0) * 100).toFixed(2);
+            const frameCount = data.frame_count || 0;
+            
+            const statusClass = result === 'FAKE' ? 'result-fake' : 'result-real';
+            const statusIcon = result === 'FAKE' ? 'fa-exclamation-triangle' : 'fa-check-circle';
+            
+            let modelPredictionsHTML = '';
+            if (data.model_predictions) {
+                for (const [model, prediction] of Object.entries(data.model_predictions)) {
+                    const predPercent = (prediction * 100).toFixed(1);
+                    modelPredictionsHTML += `
+                        <div class="detail-card">
+                            <i class="fas fa-brain"></i>
+                            <div class="label">${model}</div>
+                            <div class="value">${predPercent}%</div>
+                        </div>
+                    `;
+                }
+            }
+
+            resultContainer.innerHTML = `
+                <div class="result-header">
+                    <div class="result-status ${statusClass}">
+                        <i class="fas ${statusIcon}"></i> ${result}
+                    </div>
+                    <div class="confidence-score">
+                        <i class="fas fa-chart-pie"></i> ${confidence}% Confident
+                    </div>
+                </div>
+                
+                <div class="result-details">
+                    <div class="detail-card">
+                        <i class="fas fa-percentage"></i>
+                        <div class="label">Fake Probability</div>
+                        <div class="value">${rawPrediction}%</div>
+                    </div>
+                    <div class="detail-card">
+                        <i class="fas fa-film"></i>
+                        <div class="label">Frames Analyzed</div>
+                        <div class="value">${frameCount}</div>
+                    </div>
+                    ${modelPredictionsHTML}
+                </div>
+            `;
+            
+            resultContainer.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

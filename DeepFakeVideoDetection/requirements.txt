@@ -1,0 +1,44 @@
+# DeepFake Detection System - Complete Requirements
+# Python 3.8+ recommended
+
+# Core Deep Learning
+tensorflow-cpu>=2.10.0
+keras>=2.10.0
+
+# Computer Vision
+opencv-python-headless>=4.8.0
+opencv-contrib-python-headless>=4.8.0
+
+# Scientific Computing
+numpy>=1.23.0
+scipy>=1.9.0
+pandas>=1.5.0
+
+# Machine Learning
+scikit-learn>=1.1.0
+
+# Visualization
+matplotlib>=3.6.0
+seaborn>=0.13.0
+
+# Web Framework
+Flask>=2.3.0
+flask-cors>=4.0.0
+Werkzeug>=2.3.0
+
+# Image Processing
+Pillow>=10.0.0
+
+# Progress Bars
+tqdm>=4.65.0
+
+# Utilities
+requests>=2.28.0
+python-dateutil>=2.8.0
+
+# Optional but recommended for video processing
+imageio>=2.25.0
+imageio-ffmpeg>=0.4.8
+
+# Production Server
+gunicorn>=21.2.0
